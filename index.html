@@ -1,44 +1,217 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Third Party Website - Salesforce POC</title>
-
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brand Site – POC</title>
     <style>
+        /* ── Only shell chrome: page demo, overlay, panel, close btn ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 40px;
+            font-family: system-ui, Arial, sans-serif;
+            background: #f4f4f5;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .container {
-            max-width: 1000px;
-            margin: auto;
+        /* Demo page content */
+        .page-content {
+            text-align: center;
+            padding: 2rem;
         }
+        .page-content h1 { font-size: 2rem; color: #111; margin-bottom: 1rem; }
+        .page-content p  { color: #555; margin-bottom: 2rem; }
 
-        iframe {
-            width: 100%;
-            height: 800px;
+        /* Contact Us trigger link */
+        .contact-trigger {
+            display: inline-block;
+            padding: .75rem 2rem;
+            background: #0176d3;
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: .5rem;
+            text-decoration: none;
+            cursor: pointer;
             border: none;
+            transition: background .2s;
         }
+        .contact-trigger:hover { background: #014486; }
+
+        /* ── Overlay backdrop ── */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .45);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity .3s ease, visibility .3s ease;
+            z-index: 900;
+        }
+        .overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* ── Slide-in panel ── */
+        .contact-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: min(480px, 100vw);
+            height: 100%;
+            background: transparent;     /* LWC sets its own background */
+            box-shadow: -6px 0 32px rgba(0, 0, 0, .18);
+            transform: translateX(100%);
+            transition: transform .35s cubic-bezier(.4, 0, .2, 1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+        .contact-panel.open {
+            transform: translateX(0);
+        }
+
+        /* Close button – floats above the iframe */
+        .panel-close {
+            position: absolute;
+            top: .75rem;
+            right: .75rem;
+            z-index: 10;
+            width: 2.25rem;
+            height: 2.25rem;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,.9);
+            box-shadow: 0 2px 8px rgba(0,0,0,.2);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            line-height: 1;
+            color: #333;
+            transition: background .15s, transform .15s;
+        }
+        .panel-close:hover  { background: #fff; transform: scale(1.1); }
+        .panel-close:focus-visible {
+            outline: 2px solid #0176d3;
+            outline-offset: 2px;
+        }
+
+        /* iframe fills the entire panel — no border, no chrome */
         #salesforceFrame {
+            flex: 1;
             width: 100%;
-            height: 900px;
             border: none;
             display: block;
-            overflow: hidden;
+        }
+
+        /* Full-screen on mobile */
+        @media (max-width: 500px) {
+            .contact-panel { width: 100vw; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .overlay, .contact-panel { transition: none; }
         }
     </style>
 </head>
-
 <body>
 
-<div class="container">
-    <iframe
-        src="https://tmicc--cecdevint.sandbox.my.site.com/s/"
-        title="Salesforce Contact Us">
-    </iframe>
+    <!-- Simulated AEM brand page -->
+    <div class="page-content">
+        <h1>Welcome to Brand Site</h1>
+        <p>This is an AEM page. Click below to open the contact form.</p>
+        <button class="contact-trigger" id="openContact" aria-haspopup="dialog">
+            Contact Us
+        </button>
+    </div>
 
-</div>
+    <!-- Backdrop -->
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+
+    <!-- Slide-in contact panel -->
+    <aside
+        class="contact-panel"
+        id="contactPanel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Contact Us"
+        hidden>
+
+        <button class="panel-close" id="closeContact" aria-label="Close contact form">&#x2715;</button>
+
+        <iframe
+            id="salesforceFrame"
+            title="Contact Us"
+            src=""
+            data-src="https://tmicc--cectest.sandbox.my.site.com/s/?language=en_US&brand=MAG345&country=GB"
+            allow="clipboard-write"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation">
+        </iframe>
+    </aside>
+
+    <script>
+        const openBtn  = document.getElementById('openContact');
+        const closeBtn = document.getElementById('closeContact');
+        const panel    = document.getElementById('contactPanel');
+        const overlay  = document.getElementById('overlay');
+        const frame    = document.getElementById('salesforceFrame');
+
+        let lastFocus = null;
+
+        function openPanel() {
+            // Lazy-load the iframe only on first open
+            if (!frame.src || frame.src === window.location.href) {
+                frame.src = frame.dataset.src;
+            }
+            lastFocus = document.activeElement;
+            panel.hidden = false;
+            // Force reflow so transition plays
+            panel.getBoundingClientRect();
+            panel.classList.add('open');
+            overlay.classList.add('open');
+            overlay.removeAttribute('aria-hidden');
+            document.body.style.overflow = 'hidden';
+            closeBtn.focus();
+        }
+
+        function closePanel() {
+            panel.classList.remove('open');
+            overlay.classList.remove('open');
+            overlay.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+            panel.addEventListener('transitionend', () => {
+                panel.hidden = true;
+            }, { once: true });
+            lastFocus?.focus();
+        }
+
+        openBtn.addEventListener('click', openPanel);
+        closeBtn.addEventListener('click', closePanel);
+        overlay.addEventListener('click', closePanel);
+
+        // Escape key closes panel
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && panel.classList.contains('open')) closePanel();
+        });
+
+        // Dynamic height from SF postMessage (removes inner scrollbar)
+        window.addEventListener('message', (event) => {
+            if (event.origin !== 'https://tmicc--cectest.sandbox.my.site.com') return;
+            const { type, height } = event.data || {};
+            if (type === 'sfContactUsHeight' && typeof height === 'number') {
+                frame.style.height = height + 'px';
+            }
+        });
+    </script>
 
 </body>
 </html>
+ 
